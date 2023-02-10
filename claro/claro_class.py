@@ -105,7 +105,7 @@ class LinearFit:
         self.linear_params = {
             "slope": model.slope,
             "intercept": model.intercept,
-            "transition point (Linear)": self.fitted_trans_point,
+            "transition point (linear)": self.fitted_trans_point,
             "R_squared": model.rvalue**2,
             "half maximum height": half_max_height,
         }
