@@ -5,16 +5,16 @@ from tqdm import tqdm
 
 input_path = input("Enter a file path or a single file: ")
 if not os.path.exists(input_path):
-    print("The file/folder does not exist.")
+    print(f"The file/folder does not exist.")
     exit()
 
 if os.path.isfile(input_path):
     if not input_path.endswith(".txt"):
-        print("This is not a .txt file.")
+        print(f"This is not a .txt file.")
         exit()
 
-    print("This is a single file. \n")
-    print("Analyzing one single file... \n")
+    print(f"This is a single file. \n")
+    print(f"Analyzing one single file... \n")
     single_file = cl.LinearFit(input_path)
     single_file.linear_fit()
     single_file.print_linear_data()
@@ -26,12 +26,12 @@ if os.path.isfile(input_path):
     single_file = cl.HarryPlotter(input_path)
     single_file.plotter()
 else:
-    print("This is a folder. \n")
+    print(f"This is a folder. \n")
     folder = cl.FolderReader(input_path)
     folder.read_folder()
 
     try:
-        with open("matching_files.txt", "r") as file:
+        with open(f"matching_files.txt", "r") as file:
             paths = file.readlines()
             paths = [path.strip() for path in paths]
             data_processed = []
@@ -59,5 +59,5 @@ else:
             single_file.create_histogram()
 
     except FileNotFoundError:
-        print("matching_files.txt does not exist.")
+        print(f"matching_files.txt does not exist.")
         exit()

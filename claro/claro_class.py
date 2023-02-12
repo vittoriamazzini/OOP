@@ -105,18 +105,18 @@ class LinearFit:
         self.linear_params = {
             "slope": model.slope,
             "intercept": model.intercept,
+            "half maximum height": half_max_height,
             "transition point (linear)": self.fitted_trans_point,
             "R_squared": model.rvalue**2,
-            "half maximum height": half_max_height,
         }
         return self.linear_params
 
     def print_linear_data(self):
-        print("The data obtained from the file is:")
+        print(f"The data obtained from the file is:")
         for key, value in self.meta.items():
             print(f"{key}: {value}")
         print("\n")
-        print("The data obtained from the linear fit is:")
+        print(f"The data obtained from the linear fit is:")
         for key, value in self.linear_fit().items():
             print(f"{key}: {value}")
         print("\n")
@@ -208,7 +208,7 @@ class ErrorFunctionFit:
         return self.erf_params
 
     def print_erf_data(self):
-        print("The data obtained from the erf fit is:")
+        print(f"The data obtained from the erf fit is:")
         for key, value in self.erf_fit().items():
             if key != "erf_x" and key != "erf_y":
                 print(f"{key} : {value}")
@@ -296,7 +296,7 @@ class Histogram:
 
 class HarryPlotter:
     """
-    HarryPlotter is a class for plotting data with linear and error function fits.
+    Class for plotting data with linear and error function fits.
 
     Attributes:
         path (str): Path to the data file.
@@ -308,10 +308,8 @@ class HarryPlotter:
 
     def __init__(self, path):
         """
-        The constructor for HarryPlotter class.
-
         Parameters:
-            path (str): Path to the data file.
+        path (str): Path to the data file.
         """
         self.path = path
         self.fileinfo = _get_fileinfo(self.path)
@@ -329,6 +327,10 @@ class HarryPlotter:
         Returns:
             None
         """
+        fig, ax = plt.subplots()
+        fig.suptitle(
+            f"Fit Claro: Station {self.fileinfo['station']}, Chip {self.fileinfo['chip']}, Channel {self.fileinfo['channel']}"
+        )
         plt.plot(self.data["x"], self.data["y"], "o", label="data")
         plt.plot(
             self.linear.x,
