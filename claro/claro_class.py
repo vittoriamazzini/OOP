@@ -19,6 +19,7 @@ class FolderReader:
         """Walks through the folder and returns a list of matching folders and files."""
         matching_files = []
         bad_files = []
+
         for root, dirs, filenames in tqdm(
             os.walk(self.root_folder), "Reading files..."
         ):
@@ -76,7 +77,7 @@ class LinearFit:
         self.x = data["x"]
         self.y = data["y"]
         self.meta = data["meta"]
-        self.fit_guess = data["fit_guess"]
+        self.linear_params = {}
 
     def linear_fit(self):
         """Performs linear regression on the data and returns the results.
@@ -154,6 +155,7 @@ class ErrorFunctionFit:
         self.y = data["y"]
         self.meta = data["meta"]
         self.fit_guess = data["fit_guess"]
+        self.erf_params = {}
         self.fit_params = None
         self.erf_x_fit = None
         self.erf_y_fit = None
@@ -227,7 +229,7 @@ class DataReader:
         """
         self.path = path
         self.data = _get_data(path)
-        self.fileinfo = _get_fileinfo(self.path)
+        self.fileinfo = _get_fileinfo(path)
         self.erf = ErrorFunctionFit(path).erf_fit()
         self.data_processed = data_processed
 
@@ -312,7 +314,7 @@ class HarryPlotter:
         path (str): Path to the data file.
         """
         self.path = path
-        self.fileinfo = _get_fileinfo(self.path)
+        self.fileinfo = _get_fileinfo(path)
         self.data = _get_data(path)
         self.linear = LinearFit(path)
         self.erf = ErrorFunctionFit(path)
@@ -390,7 +392,6 @@ def modified_erf(x, height, a, b):
     return height / 2 * (1 + special.erf((x - a) / (b / 2 * np.sqrt(2))))
 
 
-@staticmethod
 def _get_fileinfo(path):
     """
     Retrieves Station chip and channel number from the path.
@@ -412,7 +413,6 @@ def _get_fileinfo(path):
     return _fileinfo
 
 
-@staticmethod
 def _get_data(path):
     """
     Retrieves data from a file and stores it in a dictionary.

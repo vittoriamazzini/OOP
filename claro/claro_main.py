@@ -16,11 +16,9 @@ if os.path.isfile(input_path):
     print(f"This is a single file. \n")
     print(f"Analyzing one single file... \n")
     single_file = cl.LinearFit(input_path)
-    single_file.linear_fit()
     single_file.print_linear_data()
 
     single_file = cl.ErrorFunctionFit(input_path)
-    single_file.erf_fit()
     single_file.print_erf_data()
 
     single_file = cl.HarryPlotter(input_path)
