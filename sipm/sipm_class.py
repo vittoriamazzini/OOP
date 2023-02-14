@@ -8,13 +8,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-# single file forward
-"""Per i file forward, bisogna leggere i dati e, per ciascun SiPM, eseguire un 
-fit lineare sulla zona lineare dei dati (che inizia a 0.75 a roomT e a 1.55 per LN2). 
-il valore 1000/m (con m coeff. angolare ) rappresenta la resistenza di quenching. 
-Poi vanno plottati i dati ed il fit, salvando i risultati in un pdf che ha un plot 
-di sipm diverso per pagina, quindi 30 pagine (fa tutto il pacchetto pdfpages). 
-Infine vanno salvati i valori in un csv in maniera simile al claro """
 # single file reverse
 """Per i file reverse si leggono i dati e per ciascun sipm si calcola la derivata 
 normalizzata "1/i * di/dv" (con np.diff o np.gradient ad esempio), poi si fitta un 
@@ -85,12 +78,12 @@ class SingleFile:
         else:
             print(f"Error: incorrect polarization value (give a value as 'f' or 'r')")
 
-        result_df = self.df_grouped.apply(analyzer_func, start_fit)
-        joined_df = self.df_sorted.join(result_df, on="SiPM")
+        resulting_df = self.df_grouped.apply(analyzer_func, start_fit)
+        joined_df = self.df_sorted.join(resulting_df, on="SiPM")
 
-        out_df = joined_df[result_cols].drop_duplicates(subset="SiPM")
+        output_df = joined_df[result_cols].drop_duplicates(subset="SiPM")
         result_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{result_file_suffix}.csv"
-        out_df.to_csv(os.path.join(savepath, result_file_name), index=False)
+        output_df.to_csv(os.path.join(savepath, result_file_name), index=False)
 
         plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{plot_file_suffix}.pdf"
         pdf_pages = PdfPages(os.path.join(savepath, plot_file_name))
@@ -190,9 +183,9 @@ def forward_plotter(data_file, pdf):
     plt.close()
 
 
-def reverse_analyzer(data, peak_width):
-    x = data["V"].to_numpy()
-    y = data["I"].to_numpy()
+def reverse_analyzer(data_file, peak_width):
+    x = np.array(data_file["V"])
+    y = np.array(data_file["I"])
 
     def norm_derivative(x, y):
         dy_dx = np.gradient(y) / np.gradient(x)
