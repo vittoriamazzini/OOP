@@ -205,31 +205,22 @@ def reverse_analyzer(data_file, peak_width):
         x_max = x[idx_max]
         fwhm = x[int(idx_max + peak_width / 2)] - x[int(idx_max - peak_width / 2)]
 
-        # Gaussian fit around the peak
-        x_gauss = x[np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))]
-        y_gauss = y_fit[
-            np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))
-        ]
-        fit_guess = [0, 1, x_max, fwhm / 2]
-
-        def gauss(x, H, A, mu, sigma):
-            return H + A * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
-
-        params, covar = optimize.curve_fit(
-            gauss, x_gauss, y_gauss, fit_guess, maxfev=20000
-        )
+        # Second degree polynomial fit around the peak
+        x_poly = x[np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))]
+        y_poly = y_fit[np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))]
+        poly_coefs = np.polyfit(x_poly, y_poly, 2)
 
     else:
-        params = [np.nan, np.nan, np.nan, np.nan]
+        poly_coefs = [np.nan, np.nan, np.nan]
         fwhm = np.nan
 
     # Returning the values
     results = {
-        "V_bd": params[2],
-        "V_bd_std": params[3],
+        "V_bd": x_max,
+        "V_bd_std": fwhm / 2,
         "width": fwhm,
         "coefs": coefs,
-        "params": params,
+        "poly_coefs": poly_coefs,
     }
     # Return the results as a pandas series
     return pd.Series(results)
@@ -247,7 +238,7 @@ def reverse_plotter(data_file, pdf):
         return 1 / y * dy_dx
 
     derivative = norm_derivative(x, y)
-    y_poly = (
+    y_poly_fifth_deg = (
         poly_coefs[0]
         + poly_coefs[1] * x
         + poly_coefs[2] * x**2
@@ -255,17 +246,18 @@ def reverse_plotter(data_file, pdf):
         + poly_coefs[4] * x**4
         + poly_coefs[5] * x**5
     )
-    x_gauss = x[
+    x_poly_second_deg = x[
         np.logical_and(
             x >= (V_bd - data_file["width"].iloc[0] / 2),
             x <= (V_bd + data_file["width"].iloc[0] / 2),
         )
     ]
-
-    def gauss(x, H, A, mu, sigma):
-        return H + A * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
-
-    y_gauss = gauss(x_gauss, *data_file["params"].iloc[0])
+    poly_coefs_peak = data_file["poly_coefs"].iloc[0]
+    y_poly_peak = (
+        poly_coefs_peak[0]
+        + poly_coefs_peak[1] * x_poly_second_deg
+        + poly_coefs_peak[2] * x_poly_second_deg**2
+    )
 
     sipm_number = list(data_file["SiPM"].drop_duplicates())[0]
 
@@ -273,6 +265,8 @@ def reverse_plotter(data_file, pdf):
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
     fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
+    ax.set_yscale("log")  # Set the y scale to logarithmic
+    ax2.set_yscale("log")
     ax.set_ylabel("Current(mA)")
     ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="darkgreen")
     ax2.tick_params(axis="y", colors="darkgreen")
@@ -280,18 +274,23 @@ def reverse_plotter(data_file, pdf):
     ax.errorbar(
         data_file["V"], data_file["I"], data_file["I_err"], marker=".", label="Data"
     )
-    ax.legend(loc="upper right")
+    # ax.legend(loc="upper right")
     ax.grid(True)
 
     ax2.scatter(x, derivative, marker="o", s=5, color="darkgreen", label="Derivative")
-    ax2.plot(x, y_poly, color="darkturquoise", label="5th-deg polynomial")
-    ax2.plot(x_gauss, y_gauss, color="darkorange", label="Gaussian around peak")
+    ax2.plot(x, y_poly_fifth_deg, color="darkturquoise", label="5th-deg polynomial")
+    ax2.plot(
+        x_poly_second_deg,
+        y_poly_peak,
+        color="darkorange",
+        label="Second degree around peak",
+    )
     ax2.axvline(
         V_bd,
         color="gold",
         label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
     )
-    ax2.legend(loc="upper left")
+    # ax2.legend(loc="upper left")
 
     pdf.savefig()
     plt.close()
