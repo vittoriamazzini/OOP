@@ -56,7 +56,7 @@ class SingleFile:
         savepath = os.getcwd()
         linear_roomT = 0.75
         linear_LN2 = 1.55
-        peak_width = 10
+        peak_width = 15
 
         if self.fileinfo["temp"] == "LN2":
             start_fit = linear_LN2
@@ -69,16 +69,18 @@ class SingleFile:
             result_file_suffix = "Forward_results"
             plot_func = forward_plotter
             plot_file_suffix = "Forward"
+            parameter = start_fit
         elif self.fileinfo["direction"] == "r":
             analyzer_func = reverse_analyzer
             result_cols = ["SiPM", "V_bd", "V_bd_std"]
             result_file_suffix = "Reverse_results"
             plot_func = reverse_plotter
             plot_file_suffix = "Reverse"
+            parameter = peak_width
         else:
             print(f"Error: incorrect polarization value (give a value as 'f' or 'r')")
 
-        resulting_df = self.df_grouped.apply(analyzer_func, start_fit)
+        resulting_df = self.df_grouped.apply(analyzer_func, parameter)
         joined_df = self.df_sorted.join(resulting_df, on="SiPM")
 
         output_df = joined_df[result_cols].drop_duplicates(subset="SiPM")
@@ -122,7 +124,7 @@ def forward_analyzer(data_file, start_fit):
 
     # Select the data points that should be used for the linear fit
     fit_x = x[x >= start_fit]
-    fit_y = y[y >= start_fit]
+    fit_y = y[x >= start_fit]
 
     # Perform a linear regression on the selected data points
     slope, intercept, __, __, std_err = stats.linregress(fit_x, fit_y)
@@ -178,6 +180,8 @@ def forward_plotter(data_file, pdf):
     # Label the x and y axis
     ax.set_xlabel("Voltage (V)")
     ax.set_ylabel("Current (mA)")
+    lines, labels = ax.get_legend_handles_labels()
+    ax.legend(lines, labels, loc="upper left")
 
     pdf.savefig()
     plt.close()
@@ -206,12 +210,12 @@ def reverse_analyzer(data_file, peak_width):
         fwhm = x[int(idx_max + peak_width / 2)] - x[int(idx_max - peak_width / 2)]
 
         # Second degree polynomial fit around the peak
-        x_poly = x[np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))]
-        y_poly = y_fit[np.logical_and(x >= (x_max - fwhm / 2), x <= (x_max + fwhm / 2))]
-        poly_coefs = np.polyfit(x_poly, y_poly, 2)
+        x_poly = x[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
+        y_poly = y_fit[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
+        poly_coefs_peak = np.polyfit(x_poly, y_poly, 2)
 
     else:
-        poly_coefs = [np.nan, np.nan, np.nan]
+        poly_coefs_peak = [np.nan, np.nan, np.nan]
         fwhm = np.nan
 
     # Returning the values
@@ -220,7 +224,7 @@ def reverse_analyzer(data_file, peak_width):
         "V_bd_std": fwhm / 2,
         "width": fwhm,
         "coefs": coefs,
-        "poly_coefs": poly_coefs,
+        "poly_coefs_peak": poly_coefs_peak,
     }
     # Return the results as a pandas series
     return pd.Series(results)
@@ -231,20 +235,21 @@ def reverse_plotter(data_file, pdf):
     y = np.array(data_file["I"])
 
     V_bd = data_file["V_bd"].iloc[0]
-    poly_coefs = data_file["coefs"].iloc[0]
+    coefs = data_file["coefs"].iloc[0]  # fifth degree coefs
 
     def norm_derivative(x, y):
         dy_dx = np.gradient(y) / np.gradient(x)
         return 1 / y * dy_dx
 
     derivative = norm_derivative(x, y)
+
     y_poly_fifth_deg = (
-        poly_coefs[0]
-        + poly_coefs[1] * x
-        + poly_coefs[2] * x**2
-        + poly_coefs[3] * x**3
-        + poly_coefs[4] * x**4
-        + poly_coefs[5] * x**5
+        coefs[5]
+        + coefs[4] * x
+        + coefs[3] * x**2
+        + coefs[2] * x**3
+        + coefs[1] * x**4
+        + coefs[0] * x**5
     )
     x_poly_second_deg = x[
         np.logical_and(
@@ -252,29 +257,26 @@ def reverse_plotter(data_file, pdf):
             x <= (V_bd + data_file["width"].iloc[0] / 2),
         )
     ]
-    poly_coefs_peak = data_file["poly_coefs"].iloc[0]
+    poly_coefs_peak = data_file["poly_coefs_peak"].iloc[0]
     y_poly_peak = (
-        poly_coefs_peak[0]
+        poly_coefs_peak[2]
         + poly_coefs_peak[1] * x_poly_second_deg
-        + poly_coefs_peak[2] * x_poly_second_deg**2
+        + poly_coefs_peak[0] * x_poly_second_deg**2
     )
 
     sipm_number = list(data_file["SiPM"].drop_duplicates())[0]
 
-    fig, (ax, ax2) = plt.subplots(
-        2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
-    )
+    fig, ax = plt.subplots()
     fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
-    ax.set_yscale("log")  # Set the y scale to logarithmic
-    ax2.set_yscale("log")
+    ax.set_yscale("log")
     ax.set_ylabel("Current(mA)")
+    ax2 = ax.twinx()
     ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="darkgreen")
     ax2.tick_params(axis="y", colors="darkgreen")
 
     ax.errorbar(
         data_file["V"], data_file["I"], data_file["I_err"], marker=".", label="Data"
     )
-    # ax.legend(loc="upper right")
     ax.grid(True)
 
     ax2.scatter(x, derivative, marker="o", s=5, color="darkgreen", label="Derivative")
@@ -290,7 +292,12 @@ def reverse_plotter(data_file, pdf):
         color="gold",
         label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
     )
-    # ax2.legend(loc="upper left")
+
+    # Add legends and adjust layout
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc="upper left")
+    plt.subplots_adjust(hspace=0.05)
 
     pdf.savefig()
     plt.close()
