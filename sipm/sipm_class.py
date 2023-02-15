@@ -7,16 +7,6 @@ from scipy import stats, optimize, signal
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-
-# single file reverse
-"""Per i file reverse si leggono i dati e per ciascun sipm si calcola la derivata 
-normalizzata "1/i * di/dv" (con np.diff o np.gradient ad esempio), poi si fitta un 
-polinomio di grado 5 su tale derivata e, sul massimo di questo polinomio, una gaussiana 
-(o una parabola), il cui valore medio rappresenta la V di breakdown. Vanno plottati i 
-dati, la derivata, il polinomio, la gaussiana ed il  valore di v_bd su un singolo plot 
-che ha scala semilogy, anche qui salvando tutto in un pdf con 30 grafici, uno per sipm. 
-Anche qui vanno salvati i dati in un csv
-"""
 # multiple file analyzer
 """Quando invece analizzi la cartella, che contiene 3 sottocartelle, devi aprire tutti 
 i file, fare le analisi come se fossero file singoli e poi fare gli istogrammi di v_bd 
@@ -168,7 +158,7 @@ def forward_plotter(data_file, pdf):
     ax.plot(
         lin_x,
         lin_y,
-        color="darkgreen",
+        color="limegreen",
         linewidth=1.2,
         label=f'Linear fit: Rq = ({lin_data["R_quenching"].iloc[0]:.2f} $\pm$ {lin_data["R_quenching_std"].iloc[0]:.2f}) $\Omega$',
         zorder=2,
@@ -269,22 +259,28 @@ def reverse_plotter(data_file, pdf):
     fig, ax = plt.subplots()
     fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
     ax.set_yscale("log")
-    ax.set_ylabel("Current(mA)")
+    ax.set_xlabel("Voltage (V)")
+    ax.set_ylabel("Current (mA)")
     ax2 = ax.twinx()
-    ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="darkgreen")
-    ax2.tick_params(axis="y", colors="darkgreen")
+    ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="black")
+    ax2.tick_params(axis="y", colors="black")
 
     ax.errorbar(
-        data_file["V"], data_file["I"], data_file["I_err"], marker=".", label="Data"
+        data_file["V"],
+        data_file["I"],
+        data_file["I_err"],
+        marker=".",
+        color="cadetblue",
+        label="Data",
     )
     ax.grid(True)
 
-    ax2.scatter(x, derivative, marker="o", s=5, color="darkgreen", label="Derivative")
-    ax2.plot(x, y_poly_fifth_deg, color="darkturquoise", label="5th-deg polynomial")
+    ax2.scatter(x, derivative, marker="o", s=5, color="coral", label="Derivative")
+    ax2.plot(x, y_poly_fifth_deg, color="darkgreen", label="5th-deg polynomial")
     ax2.plot(
         x_poly_second_deg,
         y_poly_peak,
-        color="darkorange",
+        color="red",
         label="Second degree around peak",
     )
     ax2.axvline(
