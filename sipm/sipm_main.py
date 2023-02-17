@@ -23,6 +23,3 @@ else:
     sipm.read_folder()
     sipm.dir_analyzer()
     sipm.create_histogram()
-
-# C:\Users\utente\Desktop\OOP\CACTUS_HPK_measurements
-# C:\Users\utente\Desktop\random
