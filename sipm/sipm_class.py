@@ -1,11 +1,15 @@
 import re
+import fnmatch
 import os
 import sys
 import numpy as np
 import pandas as pd
-from scipy import stats, optimize, signal
+from tqdm import tqdm
+from scipy import signal, stats
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
+
 
 # multiple file analyzer
 """Quando invece analizzi la cartella, che contiene 3 sottocartelle, devi aprire tutti 
@@ -42,11 +46,14 @@ class SingleFile:
 
         return self.df_grouped
 
-    def single_analyzer(self):
-        savepath = os.getcwd()
+    def single_analyzer(self, savepath=os.getcwd()):
         linear_roomT = 0.75
         linear_LN2 = 1.55
         peak_width = 15
+
+        # Create the savepath folder if it doesn't exist
+        if not os.path.exists(savepath):
+            os.makedirs(savepath)
 
         if self.fileinfo["temp"] == "LN2":
             start_fit = linear_LN2
@@ -81,6 +88,134 @@ class SingleFile:
         pdf_pages = PdfPages(os.path.join(savepath, plot_file_name))
         joined_df.groupby("SiPM").apply(plot_func, pdf_pages)
         pdf_pages.close()
+
+
+class MultipleFiles:
+    def __init__(self, root_folder):
+        self.root_folder = root_folder
+        self.matching_files = []
+
+    def read_folder(self):
+        for root, dirs, filenames in tqdm(os.walk(self.root_folder), "Reading files"):
+            for filename in filenames:
+                if fnmatch.fnmatch(os.path.join(root, filename), "*.csv"):
+                    self.matching_files.append(os.path.join(root, filename))
+        return self.matching_files
+
+    def dir_analyzer(self):
+        for file in tqdm(self.matching_files, "Analyzing files"):
+            try:
+                subfolder = re.search(".+\\\\(.+?)\\\\ARDU_.+", file).group(1)
+            except AttributeError:
+                subfolder = ""
+
+            single = SingleFile(file)
+            single.file_reader()
+            single.single_analyzer(
+                savepath=os.path.join(os.getcwd(), "resulting analysis", subfolder)
+            )
+
+            # Introduced to solve memory issues when dealing with big folders
+            matplotlib.use("agg")
+
+    def create_histogram(self, compare_day=True, compare_temp=True):
+        def df_join(directory, direction):
+            files = [
+                file
+                for file in os.listdir(directory)
+                if direction in file and file.endswith(".csv")
+            ]
+            dfs = [pd.read_csv(os.path.join(directory, file)) for file in files]
+            data = pd.concat(dfs)
+            data["subdir"] = os.path.basename(directory)
+            return data
+
+        resulting_values = os.path.join(os.getcwd(), "results")
+        fwd_all = []
+        rev_all = []
+
+        for subdir, dirs, files in os.walk(resulting_values):
+            for dir in dirs:
+                subdir_path = os.path.join(subdir, dir)
+
+                # Retrieve all the data of fwd and rev
+                forward_data = df_join(subdir_path, "Forward")
+                reverse_data = df_join(subdir_path, "Reverse")
+
+                if (
+                    compare_day == True or compare_temp == True
+                ):  # Create the full df only if needed
+                    fwd_all.append(forward_data)
+                    rev_all.append(reverse_data)
+
+                # Plot R_q and V_bd hist for each subfolder
+                fig, axs = plt.subplots(2)
+                hist_params(fig, axs, dir)
+                forward_data.plot.hist(
+                    column=["R_quenching"],
+                    ax=axs[0],
+                    bins=15,
+                    range=(
+                        min(forward_data["R_quenching"]),
+                        max(forward_data["R_quenching"]),
+                    ),
+                    color="darkgreen",
+                    alpha=0.7,
+                )
+                reverse_data.plot.hist(
+                    column=["V_bd"],
+                    ax=axs[1],
+                    bins=15,
+                    range=(min(reverse_data["V_bd"]), max(reverse_data["V_bd"])),
+                    color="darkorange",
+                    alpha=0.7,
+                )
+                plt.tight_layout()  # Prevents titles and axes from overlapping
+                plotname = f"Histograms_{dir}.png"
+                plt.savefig(
+                    os.path.join(resulting_values, plotname), bbox_inches="tight"
+                )
+                plt.close()
+                print(f"Plot saved as {resulting_values}\{plotname}")
+
+        if compare_temp == True or compare_day == True:
+            # Merge all the fwd and rev dataframes
+            fwd_all = pd.concat(fwd_all)
+            rev_all = pd.concat(rev_all)
+
+        if compare_temp == True:
+            ln2_fwd = fwd_all[fwd_all["subdir"].str.contains("LN2")]
+            ln2_rev = rev_all[fwd_all["subdir"].str.contains("LN2")]
+
+            fig, axs = plt.subplots(2)
+            hist_params(fig, axs, "Liquid Nitrogen comparison")
+            for subdir, group in ln2_fwd.groupby("subdir"):
+                group["R_quenching"].hist(ax=axs[0], label=subdir, bins=15, alpha=0.6)
+            for subdir, group in ln2_rev.groupby("subdir"):
+                group["V_bd"].hist(ax=axs[1], label=subdir, bins=15, alpha=0.6)
+            [ax.legend() for ax in axs]
+            plt.tight_layout()
+            plotname = f"LN2_comparison_hist.png"
+            plt.savefig(os.path.join(resulting_values, plotname), bbox_inches="tight")
+            plt.close()
+            print(f"Plot saved as {resulting_values}\{plotname}")
+
+        if compare_day == True:
+            fwd_april = fwd_all[fwd_all["subdir"].str.contains("_04_")]
+            rev_april = rev_all[fwd_all["subdir"].str.contains("_04_")]
+
+            fig, axs = plt.subplots(2)
+            hist_params(fig, axs, "April data comparison")
+            for subdir, group in fwd_april.groupby("subdir"):
+                group["R_quenching"].hist(ax=axs[0], label=subdir, bins=15, alpha=0.6)
+            for subdir, group in rev_april.groupby("subdir"):
+                group["V_bd"].hist(ax=axs[1], label=subdir, bins=15, alpha=0.6)
+            [ax.legend() for ax in axs]
+            plt.tight_layout()
+            plotname = f"April_data_comparison_hist.png"
+            plt.savefig(os.path.join(resulting_values, plotname), bbox_inches="tight")
+            plt.close()
+            print(f"Plot saved as {resulting_values}\{plotname}")
 
 
 #################################
@@ -158,7 +293,7 @@ def forward_plotter(data_file, pdf):
     ax.plot(
         lin_x,
         lin_y,
-        color="limegreen",
+        color="coral",
         linewidth=1.2,
         label=f'Linear fit: Rq = ({lin_data["R_quenching"].iloc[0]:.2f} $\pm$ {lin_data["R_quenching_std"].iloc[0]:.2f}) $\Omega$',
         zorder=2,
@@ -276,7 +411,7 @@ def reverse_plotter(data_file, pdf):
     ax.grid(True)
 
     ax2.scatter(x, derivative, marker="o", s=5, color="coral", label="Derivative")
-    ax2.plot(x, y_poly_fifth_deg, color="darkgreen", label="5th-deg polynomial")
+    ax2.plot(x, y_poly_fifth_deg, color="limegreen", label="5th-deg polynomial")
     ax2.plot(
         x_poly_second_deg,
         y_poly_peak,
@@ -297,3 +432,22 @@ def reverse_plotter(data_file, pdf):
 
     pdf.savefig()
     plt.close()
+
+
+def hist_params(fig, axs, dir):
+    """
+    This function takes as input a figure and two axes (as a list) and sets the titles, labels and grids for the histograms.
+    The first histogram is for the quenching resistance and the second one is for the breakdown voltage.
+    Args:
+        fig (matplotlib.figure): Figure to set the title of
+        axs (list): lsit of the axes of the plot
+        dir (str): direction of the IV curve
+    """
+    fig.suptitle(f"{dir}: R_q and V_Bd distribution")
+    [ax.grid("on") for ax in axs]
+    axs[0].set_title("Quenching Resistance Histogram")
+    axs[0].set_xlabel("$R_q [\Omega$]")
+    axs[0].set_ylabel("Frequency")
+    axs[1].set_title("Breakdown Voltage Histogram")
+    axs[1].set_xlabel("$V_{Bd}$ [V]")
+    axs[1].set_ylabel("Frequency")

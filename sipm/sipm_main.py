@@ -14,9 +14,15 @@ if os.path.isfile(input_path):
 
     print(f"This is a single file. \n")
     print(f"Analyzing one single file... \n")
-    single_file = cl.SingleFile(input_path)
-    single_file.file_reader()
-    single_file.single_analyzer()
+    sipm = cl.SingleFile(input_path)
+    sipm.file_reader()
+    sipm.single_analyzer()
 else:
     print(f"This is a folder. \n")
-    exit()
+    sipm = cl.MultipleFiles(input_path)
+    sipm.read_folder()
+    sipm.dir_analyzer()
+    # sipm.create_histogram()
+
+# C:\Users\utente\Desktop\OOP\CACTUS_HPK_measurements
+# C:\Users\utente\Desktop\random
