@@ -12,15 +12,38 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 class SingleFile:
+    """A class for reading and analyzing a single data file."""
+
     def __init__(self, path):
+        """
+        Initializes a SingleFile object.
+
+        Parameters:
+        path (str): The path to the data file to be analyzed.
+        """
         self.path = path
         self.fileinfo = _get_fileinfo(path)
         self.df_grouped = {}
 
     def file_reader(self):
+        """
+        Reads the data file and groups it by SiPM.
+
+        Returns:
+        pandas.core.groupby.DataFrameGroupBy: A grouped dataframe.
+        """
         path = self.path
 
         def header_reader(self):
+            """
+            Helper function to determine the header row of the data file.
+
+            Parameters:
+            self: A SingleFile object.
+
+            Returns:
+            int: The row number of the header.
+            """
             with open(path, "r") as file:
                 for number, line in enumerate(file):
                     if "SiPM" in line:
@@ -36,6 +59,15 @@ class SingleFile:
         return self.df_grouped
 
     def single_analyzer(self, savepath=os.getcwd()):
+        """
+        Analyzes the data and generates results and plots.
+
+        Parameters:
+        savepath (str): The directory where the results and plots will be saved.
+
+        Returns:
+        None
+        """
         linear_roomT = 0.75
         linear_LN2 = 1.55
         peak_width = 15
@@ -80,11 +112,33 @@ class SingleFile:
 
 
 class MultipleFiles:
+    """
+    A class to analyze multiple CSV files.
+
+    Attributes:
+    root_folder (str): the path to the root folder containing the CSV files.
+    matching_files (list): a list of CSV files within the root folder.
+
+    Methods:
+    read_folder: searches for CSV files within the root folder and its subdirectories.
+    dir_analyzer: analyzes the matching CSV files and saves the results.
+    create_histogram: creates and saves histograms of the analyzed data.
+    """
+
     def __init__(self, root_folder):
+        """
+        Initializes MultipleFiles with the root folder path and an empty list of matching files.
+        """
         self.root_folder = root_folder
         self.matching_files = []
 
     def read_folder(self):
+        """
+        Searches for CSV files within the root folder and its subdirectories.
+
+        Returns:
+        matching_files (list): a list of CSV files within the root folder.
+        """
         for root, dirs, filenames in os.walk(self.root_folder):
             for filename in filenames:
                 if fnmatch.fnmatch(os.path.join(root, filename), "*.csv"):
@@ -92,6 +146,13 @@ class MultipleFiles:
         return self.matching_files
 
     def dir_analyzer(self):
+        """
+        Analyzes the matching CSV files and saves the results.
+
+        The method uses the SingleFile class to read and analyze the data in each CSV file.
+        It saves the results in a folder named "resulting analysis", with a subfolder for each
+        group of CSV files (determined by a regex pattern).
+        """
         for file in tqdm(self.matching_files, "Analyzing files"):
             try:
                 subfolder = re.search(".+\\\\(.+?)\\\\ARDU_.+", file).group(1)
@@ -108,7 +169,25 @@ class MultipleFiles:
             matplotlib.use("agg")
 
     def create_histogram(self):
+        """
+        Creates and saves histograms of the analyzed data.
+
+        The method uses the resulting CSV files saved in the "resulting analysis" folder to
+        create histograms for each group of files and for different conditions. The resulting
+        histograms are saved as PNG files in the same folder.
+        """
+
         def df_join(results_directory, data_type):
+            """
+            Joins the CSV files in a given folder into a single pandas DataFrame.
+
+            Args:
+            results_directory (str): the path to the folder containing the CSV files.
+            data_type (str): a string to filter the CSV files to be joined.
+
+            Returns:
+            data (DataFrame): a pandas DataFrame containing the joined data.
+            """
             files = [
                 file
                 for file in os.listdir(results_directory)
@@ -261,6 +340,19 @@ def _get_fileinfo(path):
 
 @staticmethod
 def forward_analyzer(data_file, start_fit):
+    """
+    Analyze a reverse bias current-voltage (IV) curve to find the breakdown voltage and FWHM.
+
+    Parameters:
+        data_file (pandas.DataFrame): A DataFrame containing the reverse bias IV data.
+        peak_width (int): The width of the peaks in the 5th degree polynomial fit.
+
+    Returns:
+        pandas.Series: A Series containing the breakdown voltage, breakdown voltage standard deviation, FWHM,
+        the coefficients of the 5th degree polynomial fit, and the coefficients of the 2nd degree polynomial fit
+        around the peak.
+
+    """
     # Convert data_file columns to numpy arrays
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
@@ -291,6 +383,20 @@ def forward_analyzer(data_file, start_fit):
 
 @staticmethod
 def forward_plotter(data_file, pdf):
+    """
+    Plot the forward IV curve for a given SiPM and save the plot to a PDF.
+
+    Parameters:
+    -----------
+    data_file : pandas DataFrame
+        DataFrame with the data for the SiPM to be plotted.
+    pdf : matplotlib.backends.backend_pdf.PdfPages
+        PDF file to save the plot to.
+
+    Returns:
+    --------
+    None
+    """
     # Add a new column to the data_file DataFrame with linear values
     data_file["y_lin"] = data_file["slope"] * data_file["V"] + data_file["intercept"]
 
@@ -333,6 +439,23 @@ def forward_plotter(data_file, pdf):
 
 @staticmethod
 def reverse_analyzer(data_file, peak_width):
+    """Analyzes a reverse IV curve file and returns the results.
+
+    Args:
+        data_file (pandas.DataFrame): A DataFrame containing the reverse IV curve data.
+            It should have columns "V" and "I" for the voltage and current data, respectively.
+        peak_width (int): The expected width of the peak in the derivative curve, in number of data points.
+
+    Returns:
+        pandas.Series: A Series containing the analysis results. The following values are included:
+
+        - "V_bd": The breakdown voltage of the SiPM, in volts.
+        - "V_bd_std": The uncertainty in the breakdown voltage, in volts.
+        - "width": The full width at half maximum (FWHM) of the peak in the derivative curve, in volts.
+        - "coefs": A NumPy array containing the coefficients of the 5th degree polynomial fit to the derivative curve.
+        - "poly_coefs_peak": A NumPy array containing the coefficients of the 2nd degree polynomial fit around the peak.
+    """
+
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
 
@@ -377,6 +500,92 @@ def reverse_analyzer(data_file, peak_width):
 
 @staticmethod
 def reverse_plotter(data_file, pdf):
+    """
+    Plots the reverse current-voltage (IV) curve and its derivative, along with a 5th-degree polynomial fit
+    and a second-degree polynomial fit around the peak of the IV curve.
+
+    Parameters:
+    -----------
+    data_file : pandas DataFrame
+        A DataFrame containing the IV curve data, with columns 'V', 'I', and 'I_err', as well as additional
+        columns 'V_bd', 'V_bd_std', 'width', 'coefs', 'poly_coefs_peak', and 'SiPM'.
+    pdf : matplotlib.backends.backend_pdf.PdfPages
+        A PdfPages object to which the plot will be saved.
+
+    Returns:
+    --------
+    None"""
+    x = np.array(data_file["V"])
+    y = np.array(data_file["I"])
+
+    V_bd = data_file["V_bd"].iloc[0]
+    coefs = data_file["coefs"].iloc[0]  # fifth degree coefs
+
+    def norm_derivative(x, y):
+        dy_dx = np.gradient(y) / np.gradient(x)
+        return 1 / y * dy_dx
+
+    derivative = norm_derivative(x, y)
+
+    y_poly_fifth_deg = (
+        coefs[5]
+        + coefs[4] * x
+        + coefs[3] * x**2
+        + coefs[2] * x**3
+        + coefs[1] * x**4
+        + coefs[0] * x**5
+    )
+    x_poly_second_deg = x[
+        np.logical_and(
+            x >= (V_bd - data_file["width"].iloc[0] / 2),
+            x <= (V_bd + data_file["width"].iloc[0] / 2),
+        )
+    ]
+    poly_coefs_peak = data_file["poly_coefs_peak"].iloc[0]
+    y_poly_peak = (
+        poly_coefs_peak[2]
+        + poly_coefs_peak[1] * x_poly_second_deg
+        + poly_coefs_peak[0] * x_poly_second_deg**2
+    )
+
+    sipm_number = list(data_file["SiPM"].drop_duplicates())[0]
+
+    fig, ax = plt.subplots()
+    fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
+    ax.set_yscale("log")
+    ax.set_xlabel("Voltage (V)")
+    ax.set_ylabel("Current (mA)")
+    ax2 = ax.twinx()
+    ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="black")
+    ax2.tick_params(axis="y", colors="black")
+
+    ax.errorbar(
+        data_file["V"],
+        data_file["I"],
+        data_file["I_err"],
+        marker=".",
+        color="cadetblue",
+        label="Data",
+    )
+    ax.grid(True)
+
+    ax2.scatter(x, derivative, marker="o", s=5, color="coral", label="Derivative")
+    ax2.plot(x, y_poly_fifth_deg, color="limegreen", label="5th-deg polynomial")
+    ax2.plot(
+        x_poly_second_deg,
+        y_poly_peak,
+        color="red",
+        label="Second degree around peak",
+    )
+    ax2.axvline(
+        V_bd,
+        color="gold",
+        label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
+    )
+
+    # Add legends and adjust layout
+    lines,
+
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
 
