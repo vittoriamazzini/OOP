@@ -11,17 +11,6 @@ import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-# multiple file analyzer
-"""Quando invece analizzi la cartella, che contiene 3 sottocartelle, devi aprire tutti 
-i file, fare le analisi come se fossero file singoli e poi fare gli istogrammi di v_bd 
-e R_q, nonché confrontare le due misure ad LN2 e le due misure di Aprile. Per la 
-directory, trova il modo di tenere separate le tre sottocartelle in results (vedi come 
-ho fatto io nel codice, tanto è lìunico modo per farlo), in modo da poi poter fare 
-facilmente gli istogrammi a LN2 o quelli di Aprile. Sempre per la directory, come nel 
-caso claro, fatti la lista di file e poi chiama per ciascuno una istanza della classe 
-Single, così il codice lo scrivi solo una volta"""
-
-
 class SingleFile:
     def __init__(self, path):
         self.path = path
@@ -189,12 +178,18 @@ class MultipleFiles:
                 plt.close()
                 print(f"Plot saved as {os.path.join(resulting_values, plotname)}")
 
-        def plot_comparison_hist(data, title, subdir_filter, y_vars, plotname):
+        # Create a single dataframe with both fwd and rev results
+        all_files = pd.merge(
+            pd.concat(forward_files), pd.concat(reverse_files), on=["SiPM", "subdir"]
+        )
+
+        def plot_comparison_hist(data, title, subdir_filter, plotname):
+            y_vals = ["R_quenching", "V_bd"]
             # Create a figure with one plot for each y variable, sharing the x-axis
-            fig, axs = plt.subplots(len(y_vars), 1, sharex=True, figsize=(8, 8))
+            fig, axs = plt.subplots(2, figsize=(8, 8))
 
             # Add a title to the figure
-            fig.suptitle(f"{dir}: R_q and V_Bd distribution")
+            fig.suptitle(f"{title}: R_q and V_Bd distribution")
 
             # Set the x and y labels for the first plot
             axs[0].set_xlabel("$R_q [\Omega$]")
@@ -204,23 +199,15 @@ class MultipleFiles:
             axs[1].set_xlabel("$V_{Bd}$ [V]")
             axs[1].set_ylabel("Frequency")
 
-            # Loop over each y variable
-            for i, y_var in enumerate(y_vars):
-                grouped_df = data[data["subdir"].str.contains(subdir_filter)].groupby(
-                    "subdir"
-                )
-                print(type(grouped_df))
-                print(grouped_df)
-                # Loop over each directory that matches the given filter
-                # for subdir in grouped_df:
-                # Create a histogram of the y variable for the current directory and add it to the plot
-                #    grouped_df[y_var].hist(ax=axs[i], label=subdir, bins=15, alpha=0.6)
-                grouped_df.hist(ax=axs[i], label=subdir, bins=15, alpha=0.6)
-                # Set the y label for the current plot to the current y variable
-                axs[i].set_ylabel(y_var)
-                # Add a legend to the current plot
-                axs[i].legend()
+            # Check the comparison condition
+            matching_df = data[data["subdir"].str.contains(subdir_filter)]
 
+            # Define colors for each group
+            for i, y_val in enumerate(y_vals):
+                for subdir, group in matching_df.groupby("subdir"):
+                    group[y_val].hist(ax=axs[i], label=subdir, bins=15, alpha=0.6)
+
+            [ax.legend() for ax in axs]
             # Adjust the layout of the plots
             plt.tight_layout()
 
@@ -233,22 +220,17 @@ class MultipleFiles:
             # Print the path to the saved plot
             print(f"Plot saved as {os.path.join(resulting_values, plotname)}")
 
-        forward_files = pd.concat(forward_files)
-        reverse_files = pd.concat(reverse_files)
-
         plot_comparison_hist(
-            forward_files,
+            all_files,
             "Liquid Nitrogen comparison",
             "LN2",
-            ["R_quenching", "V_bd"],
             "LN2_comparison_hist.png",
         )
 
         plot_comparison_hist(
-            reverse_files,
+            all_files,
             "April data comparison",
             "_04_",
-            ["R_quenching", "V_bd"],
             "April_data_comparison_hist.png",
         )
 

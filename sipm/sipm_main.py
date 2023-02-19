@@ -30,14 +30,14 @@ else:
     print(f"This is a folder. Analyzing...\n")
 
     # Analyze folder using sipm_class.MultipleFiles
-    # try:
-    sipm = cl.MultipleFiles(input_path)
-    sipm.read_folder()
-    sipm.dir_analyzer()
-    sipm.create_histogram()
-    # except Exception as e:
-    #    print("Error analyzing:")
-    #    print(e)
+    try:
+        sipm = cl.MultipleFiles(input_path)
+        sipm.read_folder()
+        sipm.dir_analyzer()
+        sipm.create_histogram()
+    except Exception as e:
+        print("Error analyzing:")
+        print(e)
 
 
 # C:\Users\utente\Desktop\OOP\CACTUS_HPK_measurements
