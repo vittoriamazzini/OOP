@@ -12,7 +12,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 class SingleFile:
-    """A class for reading and analyzing a single data file."""
+    """
+    A class for reading and analyzing a single data file.
+    """
 
     def __init__(self, path):
         """
@@ -29,8 +31,7 @@ class SingleFile:
         """
         Reads the data file and groups it by SiPM.
 
-        Returns:
-        pandas.core.groupby.DataFrameGroupBy: A grouped dataframe.
+        Returns: a grouped dataframe.
         """
         path = self.path
 
@@ -50,7 +51,7 @@ class SingleFile:
                         return number
                     else:
                         print("Error : header not found")
-                        sys.exit(1)
+                        exit()
 
         self.df = pd.read_csv(path, header=header_reader(path))
         self.df_sorted = self.df.sort_values(by=["SiPM", "Step"], ignore_index=True)
@@ -68,6 +69,7 @@ class SingleFile:
         Returns:
         None
         """
+
         linear_roomT = 0.75
         linear_LN2 = 1.55
         peak_width = 15
@@ -82,47 +84,38 @@ class SingleFile:
             start_fit = linear_roomT
 
         if self.fileinfo["direction"] == "f":
-            analyzer_func = forward_analyzer
-            result_cols = ["SiPM", "R_quenching", "R_quenching_std"]
-            result_file_suffix = "Forward_results"
-            plot_func = forward_plotter
-            plot_file_suffix = "Forward"
+            analyzer_function = forward_analyzer
+            resulting_columns = ["SiPM", "R_quenching", "R_quenching_std"]
+            resulting_suffix = "Forward_results"
+            plotter_function = forward_plotter
+            plot_suffix = "Forward"
             parameter = start_fit
         elif self.fileinfo["direction"] == "r":
-            analyzer_func = reverse_analyzer
-            result_cols = ["SiPM", "V_bd", "V_bd_std"]
-            result_file_suffix = "Reverse_results"
-            plot_func = reverse_plotter
-            plot_file_suffix = "Reverse"
+            analyzer_function = reverse_analyzer
+            resulting_columns = ["SiPM", "V_bd", "V_bd_std"]
+            resulting_suffix = "Reverse_results"
+            plotter_function = reverse_plotter
+            plot_suffix = "Reverse"
             parameter = peak_width
         else:
             print(f"Error: incorrect polarization value (give a value as 'f' or 'r')")
 
-        resulting_df = self.df_grouped.apply(analyzer_func, parameter)
+        resulting_df = self.df_grouped.apply(analyzer_function, parameter)
         joined_df = self.df_sorted.join(resulting_df, on="SiPM")
 
-        output_df = joined_df[result_cols].drop_duplicates(subset="SiPM")
-        result_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{result_file_suffix}.csv"
-        output_df.to_csv(os.path.join(savepath, result_file_name), index=False)
+        output_df = joined_df[resulting_columns].drop_duplicates(subset="SiPM")
+        resulting_filename = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{resulting_suffix}.csv"
+        output_df.to_csv(os.path.join(savepath, resulting_filename), index=False)
 
-        plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{plot_file_suffix}.pdf"
+        plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{plot_suffix}.pdf"
         pdf_pages = PdfPages(os.path.join(savepath, plot_file_name))
-        joined_df.groupby("SiPM").apply(plot_func, pdf_pages)
+        joined_df.groupby("SiPM").apply(plotter_function, pdf_pages)
         pdf_pages.close()
 
 
 class MultipleFiles:
     """
     A class to analyze multiple CSV files.
-
-    Attributes:
-    root_folder (str): the path to the root folder containing the CSV files.
-    matching_files (list): a list of CSV files within the root folder.
-
-    Methods:
-    read_folder: searches for CSV files within the root folder and its subdirectories.
-    dir_analyzer: analyzes the matching CSV files and saves the results.
-    create_histogram: creates and saves histograms of the analyzed data.
     """
 
     def __init__(self, root_folder):
@@ -151,7 +144,7 @@ class MultipleFiles:
 
         The method uses the SingleFile class to read and analyze the data in each CSV file.
         It saves the results in a folder named "resulting analysis", with a subfolder for each
-        group of CSV files (determined by a regex pattern).
+        group of CSV files.
         """
         for file in tqdm(self.matching_files, "Analyzing files"):
             try:
@@ -173,8 +166,7 @@ class MultipleFiles:
         Creates and saves histograms of the analyzed data.
 
         The method uses the resulting CSV files saved in the "resulting analysis" folder to
-        create histograms for each group of files and for different conditions. The resulting
-        histograms are saved as PNG files in the same folder.
+        create histograms for each group of files and for different conditions.
         """
 
         def df_join(results_directory, data_type):
@@ -203,7 +195,7 @@ class MultipleFiles:
         forward_files = []
         reverse_files = []
 
-        for subdir, dirs, files in os.walk(resulting_values):
+        for subdir, dirs in os.walk(resulting_values):
             for dir in dirs:
                 subdir_path = os.path.join(subdir, dir)
 
@@ -287,16 +279,13 @@ class MultipleFiles:
                     group[y_val].hist(ax=axs[i], label=subdir, bins=15, alpha=0.6)
 
             [ax.legend() for ax in axs]
-            # Adjust the layout of the plots
+
             plt.tight_layout()
 
-            # Save the plot to a file
             plt.savefig(os.path.join(resulting_values, plotname), bbox_inches="tight")
 
-            # Close the plot
             plt.close()
 
-            # Print the path to the saved plot
             print(f"Plot saved as {os.path.join(resulting_values, plotname)}")
 
         plot_comparison_hist(
@@ -341,9 +330,9 @@ def _get_fileinfo(path):
 @staticmethod
 def forward_analyzer(data_file, start_fit):
     """
-    Analyze a reverse bias current-voltage (IV) curve to find the breakdown voltage and FWHM.
+    Analyze the forward IV curve file and returns the results.
 
-    Parameters:
+    Args:
         data_file (pandas.DataFrame): A DataFrame containing the reverse bias IV data.
         peak_width (int): The width of the peaks in the 5th degree polynomial fit.
 
@@ -393,9 +382,7 @@ def forward_plotter(data_file, pdf):
     pdf : matplotlib.backends.backend_pdf.PdfPages
         PDF file to save the plot to.
 
-    Returns:
-    --------
-    None
+    Returns: None
     """
     # Add a new column to the data_file DataFrame with linear values
     data_file["y_lin"] = data_file["slope"] * data_file["V"] + data_file["intercept"]
@@ -512,9 +499,8 @@ def reverse_plotter(data_file, pdf):
     pdf : matplotlib.backends.backend_pdf.PdfPages
         A PdfPages object to which the plot will be saved.
 
-    Returns:
-    --------
-    None"""
+    Returns: None
+    """
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
 
@@ -582,9 +568,6 @@ def reverse_plotter(data_file, pdf):
         color="gold",
         label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
     )
-
-    # Add legends and adjust layout
-    lines,
 
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])

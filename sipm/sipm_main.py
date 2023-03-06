@@ -41,4 +41,3 @@ else:
 
 
 # C:\Users\utente\Desktop\OOP\CACTUS_HPK_measurements
-# C:\Users\utente\Desktop\random

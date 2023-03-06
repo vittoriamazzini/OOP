@@ -24,7 +24,7 @@ if os.path.isfile(input_path):
     single_file = cl.HarryPlotter(input_path)
     single_file.plotter()
 else:
-    print(f"This is a folder. \n")
+    print(f"This is a folder. Analyzing...\n")
     folder = cl.FolderReader(input_path)
     folder.read_folder()
 

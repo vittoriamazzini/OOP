@@ -20,9 +20,7 @@ class FolderReader:
         matching_files = []
         bad_files = []
 
-        for root, dirs, filenames in tqdm(
-            os.walk(self.root_folder), "Reading files..."
-        ):
+        for root, dirs, filenames in os.walk(self.root_folder):
             if fnmatch.fnmatch(
                 root, "*Station_1__*/Station_1__??_Summary/Chip_*/S_curve"
             ):
