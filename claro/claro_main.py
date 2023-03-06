@@ -34,7 +34,7 @@ else:
             paths = [path.strip() for path in paths]
             data_processed = []
 
-            for path in tqdm(paths, desc="Analyzing files..."):
+            for path in tqdm(paths, "Analyzing files..."):
                 single_file = cl.DataReader(path, data_processed)
                 single_file.data_reader()
 

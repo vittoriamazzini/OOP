@@ -20,7 +20,9 @@ class FolderReader:
         matching_files = []
         bad_files = []
 
-        for root, dirs, filenames in os.walk(self.root_folder):
+        for root, dirs, filenames in tqdm(
+            os.walk(self.root_folder), "Reading files..."
+        ):
             if fnmatch.fnmatch(
                 root, "*Station_1__*/Station_1__??_Summary/Chip_*/S_curve"
             ):
@@ -49,15 +51,6 @@ class FolderReader:
 class LinearFit:
     """Performs linear regression on the data in a file.
 
-    The data must be in the form of a dictionary with the following keys:
-        - "height"
-        - "tr_point"
-        - "width"
-        - "x"
-        - "y"
-        - "meta"
-        - "fit_guess"
-
     The data is stored in the instance variables `height`, `tr_point`, `width`, `x`,
     `y`, `_metadata`, and `fit_guess`.
 
@@ -67,6 +60,12 @@ class LinearFit:
     """
 
     def __init__(self, path):
+        """Initialize the class.
+
+        Parameters:
+        path (str): The file path for the data.
+
+        """
         self.path = path
         data = _get_data(path)
         self.height = data["height"]
@@ -91,9 +90,11 @@ class LinearFit:
 
         x_fit = self.x
         y_fit = self.y
+
         mask = np.ones(len(self.y), dtype=bool)
         mask[np.where(self.y[:-1] == self.y[1:])[0]] = False
         self.x_fit, self.y_fit = self.x[mask], self.y[mask]
+
         self.x_fit = x_fit
         self.y_fit = y_fit
 
@@ -139,7 +140,7 @@ class ErrorFunctionFit:
     """
 
     def __init__(self, path):
-        """Initialize the class with data from a file.
+        """Initialize the class.
 
         Parameters:
             path (str): The file path for the data.
@@ -222,8 +223,9 @@ class DataReader:
         """
         Initializes the DataReader instance.
 
-        :param path: Path to the file from which the data is to be read.
-        :param data_processed: A list where the processed data will be appended.
+        Params:
+        path: Path to the file from which the data is to be read.
+        data_processed: A list where the processed data will be appended.
         """
         self.path = path
         self.data = _get_data(path)
@@ -235,7 +237,7 @@ class DataReader:
         """
         Reads data from a file, processes it, and appends the processed data to the data_processed list.
 
-        :return: None
+        Return: None
         """
         row = [
             self.fileinfo["station"],
@@ -308,8 +310,11 @@ class HarryPlotter:
 
     def __init__(self, path):
         """
+        Initialize the class.
+
         Parameters:
-        path (str): Path to the data file.
+        path (str): The file path for the data.
+
         """
         self.path = path
         self.fileinfo = _get_fileinfo(path)
@@ -328,6 +333,7 @@ class HarryPlotter:
             None
         """
         fig, ax = plt.subplots()
+
         fig.suptitle(
             f"Fit Claro: Station {self.fileinfo['station']}, Chip {self.fileinfo['chip']}, Channel {self.fileinfo['channel']}"
         )
