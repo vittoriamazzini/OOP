@@ -10,4 +10,4 @@ The project consists of two different assignments:
 2) SiPM: Evaluate the direct and reverse curves of the SiPM data in the "CACTUS_HPK" folder. Analyze the peaks of each waveform. Estimate the dark count rate.
 
 ## How to use
-Download the *_main.py and *_class.py and store them in a folder. The *_main.py file is the "front end" of the program, where change the various function arguments. When you run the program, you must insert a valid .txt file or a directory. 
+Download the *_main.py and *_class.py and store them in a folder. The *_main.py file is the "front end" of the program, where you can change the various function arguments. When you run the program, you must insert a valid .txt (for claro) or .csv (for sipm) file or a directory. 
