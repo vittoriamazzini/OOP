@@ -20,9 +20,7 @@ class FolderReader:
         matching_files = []
         bad_files = []
 
-        for root, dirs, filenames in tqdm(
-            os.walk(self.root_folder), "Reading files..."
-        ):
+        for root, dirs, filenames in tqdm(os.walk(self.root_folder), "Reading files"):
             if fnmatch.fnmatch(
                 root, "*Station_1__*/Station_1__??_Summary/Chip_*/S_curve"
             ):
@@ -85,12 +83,11 @@ class LinearFit:
                 - "intercept"
                 - "transition point (linear)"
                 - "R_squared"
-
         """
-
         x_fit = self.x
         y_fit = self.y
 
+        # removing duplicates values
         mask = np.ones(len(self.y), dtype=bool)
         mask[np.where(self.y[:-1] == self.y[1:])[0]] = False
         self.x_fit, self.y_fit = self.x[mask], self.y[mask]
