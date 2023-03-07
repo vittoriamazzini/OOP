@@ -1,7 +1,6 @@
 import re
 import fnmatch
 import os
-import sys
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -66,8 +65,7 @@ class SingleFile:
         Parameters:
         savepath (str): The directory where the results and plots will be saved.
 
-        Returns:
-        None
+        Returns: None
         """
 
         linear_roomT = 0.75
@@ -143,7 +141,7 @@ class MultipleFiles:
         Analyzes the matching CSV files and saves the results.
 
         The method uses the SingleFile class to read and analyze the data in each CSV file.
-        It saves the results in a folder named "resulting analysis", with a subfolder for each
+        It saves the results in a folder named "resulting sipm analys", with a subfolder for each
         group of CSV files.
         """
         for file in tqdm(self.matching_files, "Analyzing files"):
@@ -165,7 +163,7 @@ class MultipleFiles:
         """
         Creates and saves histograms of the analyzed data.
 
-        The method uses the resulting CSV files saved in the "resulting analysis" folder to
+        The method uses the resulting CSV files saved in the "resulting sipm analys" folder to
         create histograms for each group of files and for different conditions.
         """
 
@@ -195,7 +193,7 @@ class MultipleFiles:
         forward_files = []
         reverse_files = []
 
-        for subdir, dirs in os.walk(resulting_values):
+        for subdir, dirs, files in os.walk(resulting_values):
             for dir in dirs:
                 subdir_path = os.path.join(subdir, dir)
 
@@ -249,31 +247,34 @@ class MultipleFiles:
                 plt.close()
                 print(f"Plot saved as {os.path.join(resulting_values, plotname)}")
 
-        # Create a single dataframe with both fwd and rev results
         all_files = pd.merge(
             pd.concat(forward_files), pd.concat(reverse_files), on=["SiPM", "subdir"]
         )
 
         def plot_comparison_hist(data, title, subdir_filter, plotname):
+            """
+            Helper function to plot histograms of the R_quenching and V_bd columns.
+            Args:
+                data (pd.DataFrame): A pandas DataFrame containing the data to be plotted.
+                title (str): The title of the plot.
+                subdir_filter (str): Filter for the data by subdirectory name.
+                plotname (str): The name of the file to save the plot to.
+
+            Returns: None
+            """
+
             y_vals = ["R_quenching", "V_bd"]
-            # Create a figure with one plot for each y variable, sharing the x-axis
+
             fig, axs = plt.subplots(2, figsize=(8, 8))
-
-            # Add a title to the figure
             fig.suptitle(f"{title}: R_q and V_Bd distribution")
-
-            # Set the x and y labels for the first plot
             axs[0].set_xlabel("$R_q [\Omega$]")
             axs[0].set_ylabel("Frequency")
-
-            # Set the x and y labels for the second plot
             axs[1].set_xlabel("$V_{Bd}$ [V]")
             axs[1].set_ylabel("Frequency")
 
             # Check the comparison condition
             matching_df = data[data["subdir"].str.contains(subdir_filter)]
 
-            # Define colors for each group
             for i, y_val in enumerate(y_vals):
                 for subdir, group in matching_df.groupby("subdir"):
                     group[y_val].hist(ax=axs[i], label=subdir, bins=15, alpha=0.6)
@@ -283,7 +284,6 @@ class MultipleFiles:
             plt.tight_layout()
 
             plt.savefig(os.path.join(resulting_values, plotname), bbox_inches="tight")
-
             plt.close()
 
             print(f"Plot saved as {os.path.join(resulting_values, plotname)}")
@@ -342,22 +342,17 @@ def forward_analyzer(data_file, start_fit):
         around the peak.
 
     """
-    # Convert data_file columns to numpy arrays
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
 
-    # Select the data points that should be used for the linear fit
     fit_x = x[x >= start_fit]
     fit_y = y[x >= start_fit]
 
-    # Perform a linear regression on the selected data points
     slope, intercept, __, __, std_err = stats.linregress(fit_x, fit_y)
 
-    # Calculate the quenching resistance and its standard deviation
     quenching_resistance = 1000 / slope
     quenching_res_std = max(std_err, 0.03 * quenching_resistance)
 
-    # Store the results in a dictionary
     results = {
         "R_quenching": quenching_resistance,
         "R_quenching_std": quenching_res_std,
@@ -366,7 +361,6 @@ def forward_analyzer(data_file, start_fit):
         "intercept": intercept,
     }
 
-    # Return the results as a pandas series
     return pd.Series(results)
 
 
@@ -384,6 +378,7 @@ def forward_plotter(data_file, pdf):
 
     Returns: None
     """
+
     # Add a new column to the data_file DataFrame with linear values
     data_file["y_lin"] = data_file["slope"] * data_file["V"] + data_file["intercept"]
 
@@ -392,16 +387,11 @@ def forward_plotter(data_file, pdf):
     lin_x = lin_data["V"]
     lin_y = lin_data["y_lin"]
 
-    # Create a figure and axis object
     fig, ax = plt.subplots()
 
-    # Get the unique SiPM number
     sipm_number = lin_data["SiPM"].drop_duplicates().iloc[0]
 
-    # Set the title of the figure
     fig.suptitle(f"Forward IV curve: SiPM {sipm_number}")
-
-    # Plot the linear fit and data
     ax.plot(
         lin_x,
         lin_y,
@@ -414,7 +404,6 @@ def forward_plotter(data_file, pdf):
         data_file["V"], data_file["I"], data_file["I_err"], marker=".", zorder=1
     )
 
-    # Label the x and y axis
     ax.set_xlabel("Voltage (V)")
     ax.set_ylabel("Current (mA)")
     lines, labels = ax.get_legend_handles_labels()
@@ -450,21 +439,17 @@ def reverse_analyzer(data_file, peak_width):
         dy_dx = np.gradient(y) / np.gradient(x)
         return 1 / y * dy_dx
 
-    # Evaluation of the 1st derivative
     derivative = norm_derivative(x, y)
 
-    # 5th degree polynomial fit
     coefs = np.polyfit(x, derivative, 5)
     y_fit = np.polyval(coefs, x)
 
-    # Peak finder
     peaks, _ = signal.find_peaks(y_fit, width=peak_width)
     if len(peaks) > 0:
         idx_max = peaks[0]
         x_max = x[idx_max]
         fwhm = x[int(idx_max + peak_width / 2)] - x[int(idx_max - peak_width / 2)]
 
-        # Second degree polynomial fit around the peak
         x_poly = x[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
         y_poly = y_fit[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
         poly_coefs_peak = np.polyfit(x_poly, y_poly, 2)
@@ -473,7 +458,6 @@ def reverse_analyzer(data_file, peak_width):
         poly_coefs_peak = [np.nan, np.nan, np.nan]
         fwhm = np.nan
 
-    # Returning the values
     results = {
         "V_bd": x_max,
         "V_bd_std": fwhm / 2,
@@ -481,7 +465,7 @@ def reverse_analyzer(data_file, peak_width):
         "coefs": coefs,
         "poly_coefs_peak": poly_coefs_peak,
     }
-    # Return the results as a pandas series
+
     return pd.Series(results)
 
 
@@ -569,75 +553,6 @@ def reverse_plotter(data_file, pdf):
         label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
     )
 
-    x = np.array(data_file["V"])
-    y = np.array(data_file["I"])
-
-    V_bd = data_file["V_bd"].iloc[0]
-    coefs = data_file["coefs"].iloc[0]  # fifth degree coefs
-
-    def norm_derivative(x, y):
-        dy_dx = np.gradient(y) / np.gradient(x)
-        return 1 / y * dy_dx
-
-    derivative = norm_derivative(x, y)
-
-    y_poly_fifth_deg = (
-        coefs[5]
-        + coefs[4] * x
-        + coefs[3] * x**2
-        + coefs[2] * x**3
-        + coefs[1] * x**4
-        + coefs[0] * x**5
-    )
-    x_poly_second_deg = x[
-        np.logical_and(
-            x >= (V_bd - data_file["width"].iloc[0] / 2),
-            x <= (V_bd + data_file["width"].iloc[0] / 2),
-        )
-    ]
-    poly_coefs_peak = data_file["poly_coefs_peak"].iloc[0]
-    y_poly_peak = (
-        poly_coefs_peak[2]
-        + poly_coefs_peak[1] * x_poly_second_deg
-        + poly_coefs_peak[0] * x_poly_second_deg**2
-    )
-
-    sipm_number = list(data_file["SiPM"].drop_duplicates())[0]
-
-    fig, ax = plt.subplots()
-    fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
-    ax.set_yscale("log")
-    ax.set_xlabel("Voltage (V)")
-    ax.set_ylabel("Current (mA)")
-    ax2 = ax.twinx()
-    ax2.set_ylabel(r"$I^{-1} \frac{dI}{dV}$", color="black")
-    ax2.tick_params(axis="y", colors="black")
-
-    ax.errorbar(
-        data_file["V"],
-        data_file["I"],
-        data_file["I_err"],
-        marker=".",
-        color="cadetblue",
-        label="Data",
-    )
-    ax.grid(True)
-
-    ax2.scatter(x, derivative, marker="o", s=5, color="coral", label="Derivative")
-    ax2.plot(x, y_poly_fifth_deg, color="limegreen", label="5th-deg polynomial")
-    ax2.plot(
-        x_poly_second_deg,
-        y_poly_peak,
-        color="red",
-        label="Second degree around peak",
-    )
-    ax2.axvline(
-        V_bd,
-        color="gold",
-        label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
-    )
-
-    # Add legends and adjust layout
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc="upper left")
