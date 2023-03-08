@@ -76,7 +76,7 @@ class SingleFile:
         if not os.path.exists(savepath):
             os.makedirs(savepath)
 
-        if self.fileinfo["temp"] == "LN2":
+        if self.fileinfo["temperature"] == "LN2":
             start_fit = linear_LN2
         else:
             start_fit = linear_roomT
@@ -84,16 +84,16 @@ class SingleFile:
         if self.fileinfo["direction"] == "f":
             analyzer_function = forward_analyzer
             resulting_columns = ["SiPM", "R_quenching", "R_quenching_std"]
-            resulting_suffix = "Forward_results"
+            resulting_suffix = "forward_results"
             plotter_function = forward_plotter
-            plot_suffix = "Forward"
+            plot_suffix = "forward"
             parameter = start_fit
         elif self.fileinfo["direction"] == "r":
             analyzer_function = reverse_analyzer
             resulting_columns = ["SiPM", "V_bd", "V_bd_std"]
-            resulting_suffix = "Reverse_results"
+            resulting_suffix = "reverse_results"
             plotter_function = reverse_plotter
-            plot_suffix = "Reverse"
+            plot_suffix = "reverse"
             parameter = peak_width
         else:
             print(f"Error: incorrect polarization value (give a value as 'f' or 'r')")
@@ -102,10 +102,10 @@ class SingleFile:
         joined_df = self.df_sorted.join(resulting_df, on="SiPM")
 
         output_df = joined_df[resulting_columns].drop_duplicates(subset="SiPM")
-        resulting_filename = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temp']}_{resulting_suffix}.csv"
+        resulting_filename = f"Arduino{self.fileinfo['arduino']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temperature']}_{resulting_suffix}.csv"
         output_df.to_csv(os.path.join(savepath, resulting_filename), index=False)
 
-        plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temp']}_{plot_suffix}.pdf"
+        plot_file_name = f"Arduino{self.fileinfo['arduino']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temperature']}_{plot_suffix}.pdf"
         pdf_pages = PdfPages(os.path.join(savepath, plot_file_name))
         joined_df.groupby("SiPM").apply(plotter_function, pdf_pages)
         pdf_pages.close()
@@ -156,7 +156,6 @@ class MultipleFiles:
                 savepath=os.path.join(os.getcwd(), "resulting analysis", subfolder)
             )
 
-            # Introduced to solve memory issues when dealing with big folders
             matplotlib.use("agg")
 
     def create_histogram(self):
@@ -198,8 +197,8 @@ class MultipleFiles:
                 subdir_path = os.path.join(subdir, dir)
 
                 try:
-                    forward_data = df_join(subdir_path, "Forward")
-                    reverse_data = df_join(subdir_path, "Reverse")
+                    forward_data = df_join(subdir_path, "forward")
+                    reverse_data = df_join(subdir_path, "reverse")
                 except Exception as e:
                     print(f"Error processing data in {subdir_path}: {e}")
                     continue
@@ -210,10 +209,10 @@ class MultipleFiles:
                 fig, axs = plt.subplots(2)
                 fig.suptitle(f"{dir}: R_q and V_Bd distribution")
 
-                axs[0].set_title("Quenching Resistance Histogram")
+                axs[0].set_title("Histogram of the Quenching Resistance")
                 axs[0].set_xlabel("$R_q [\Omega$]")
                 axs[0].set_ylabel("Frequency")
-                axs[1].set_title("Breakdown Voltage Histogram")
+                axs[1].set_title("Histogram of the Breakdown Voltage")
                 axs[1].set_xlabel("$V_{Bd}$ [V]")
                 axs[1].set_ylabel("Frequency")
 
@@ -239,7 +238,7 @@ class MultipleFiles:
                 )
 
                 plt.tight_layout()
-                plotname = f"Histograms_{dir}.png"
+                plotname = f"Histograms of {dir}.png"
 
                 plt.savefig(
                     os.path.join(resulting_values, plotname), bbox_inches="tight"
@@ -322,14 +321,14 @@ def _file_information(path):
     _temperature = re.search(".+_(.+?)_dataframe.+", path).group(1)
     _test = re.search(".+Test_(.+?)_.+", path).group(1)
 
-    _fileinfo = {
+    _file_information = {
         "direction": _direction,
-        "ardu": _arduino,
-        "temp": _temperature,
+        "arduino": _arduino,
+        "temperature": _temperature,
         "test": _test,
     }
 
-    return _fileinfo
+    return _file_information
 
 
 @staticmethod

@@ -67,7 +67,7 @@ class LinearFit:
 
         """
         self.path = path
-        data = _get_data(path)
+        data = _get_data_from_files(path)
         self.height = data["height"]
         self.tr_point = data["tr_point"]
         self.width = data["width"]
@@ -145,7 +145,7 @@ class ErrorFunctionFit:
             path (str): The file path for the data.
 
         """
-        data = _get_data(path)
+        data = _get_data_from_files(path)
         self.height = data["height"]
         self.tr_point = data["tr_point"]
         self.width = data["width"]
@@ -227,7 +227,7 @@ class DataReader:
         data_processed: A list where the processed data will be appended.
         """
         self.path = path
-        self.data = _get_data(path)
+        self.data = _get_data_from_files(path)
         self.fileinfo = _file_information(path)
         self.erf = ErrorFunctionFit(path).erf_fit()
         self.data_processed = data_processed
@@ -317,7 +317,7 @@ class HarryPlotter:
         """
         self.path = path
         self.fileinfo = _file_information(path)
-        self.data = _get_data(path)
+        self.data = _get_data_from_files(path)
         self.linear = LinearFit(path)
         self.erf = ErrorFunctionFit(path)
 
@@ -416,7 +416,7 @@ def _file_information(path):
     return _fileinfo
 
 
-def _get_data(path):
+def _get_data_from_files(path):
     """
     Retrieves data from a file and stores it in a dictionary.
 
@@ -441,7 +441,7 @@ def _get_data(path):
     }
     fit_guess = [height, tr_point, width]
 
-    all_data = {
+    data_from_file = {
         "height": height,
         "tr_point": tr_point,
         "width": width,
@@ -450,4 +450,4 @@ def _get_data(path):
         "meta": _metadata,
         "fit_guess": fit_guess,
     }
-    return all_data
+    return data_from_file
