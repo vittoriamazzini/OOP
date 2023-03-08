@@ -23,7 +23,7 @@ class SingleFile:
         path (str): The path to the data file to be analyzed.
         """
         self.path = path
-        self.fileinfo = _get_fileinfo(path)
+        self.fileinfo = _file_information(path)
         self.df_grouped = {}
 
     def file_reader(self):
@@ -102,10 +102,10 @@ class SingleFile:
         joined_df = self.df_sorted.join(resulting_df, on="SiPM")
 
         output_df = joined_df[resulting_columns].drop_duplicates(subset="SiPM")
-        resulting_filename = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{resulting_suffix}.csv"
+        resulting_filename = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temp']}_{resulting_suffix}.csv"
         output_df.to_csv(os.path.join(savepath, resulting_filename), index=False)
 
-        plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_Temp{self.fileinfo['temp']}_{plot_suffix}.pdf"
+        plot_file_name = f"Arduino{self.fileinfo['ardu']}_Test{self.fileinfo['test']}_temperature{self.fileinfo['temp']}_{plot_suffix}.pdf"
         pdf_pages = PdfPages(os.path.join(savepath, plot_file_name))
         joined_df.groupby("SiPM").apply(plotter_function, pdf_pages)
         pdf_pages.close()
@@ -307,7 +307,7 @@ class MultipleFiles:
 
 
 @staticmethod
-def _get_fileinfo(path):
+def _file_information(path):
     """
     Extracts relevant information from a file path using regular expressions.
 
@@ -317,12 +317,17 @@ def _get_fileinfo(path):
     Returns:
         dict: A dictionary containing the extracted information.
     """
-    _ardu = re.search(".+ARDU_(.+?)_.+", path).group(1)
+    _arduino = re.search(".+ARDU_(.+?)_.+", path).group(1)
     _direction = re.search(".+[0-9]_(.+?)_.+", path).group(1)
+    _temperature = re.search(".+_(.+?)_dataframe.+", path).group(1)
     _test = re.search(".+Test_(.+?)_.+", path).group(1)
-    _temp = re.search(".+_(.+?)_dataframe.+", path).group(1)
 
-    _fileinfo = {"direction": _direction, "ardu": _ardu, "test": _test, "temp": _temp}
+    _fileinfo = {
+        "direction": _direction,
+        "ardu": _arduino,
+        "temp": _temperature,
+        "test": _test,
+    }
 
     return _fileinfo
 
@@ -395,13 +400,18 @@ def forward_plotter(data_file, pdf):
     ax.plot(
         lin_x,
         lin_y,
-        color="coral",
+        color="red",
         linewidth=1.2,
         label=f'Linear fit: Rq = ({lin_data["R_quenching"].iloc[0]:.2f} $\pm$ {lin_data["R_quenching_std"].iloc[0]:.2f}) $\Omega$',
         zorder=2,
     )
     ax.errorbar(
-        data_file["V"], data_file["I"], data_file["I_err"], marker=".", zorder=1
+        data_file["V"],
+        data_file["I"],
+        data_file["I_err"],
+        color="limegreen",
+        marker=".",
+        zorder=1,
     )
 
     ax.set_xlabel("Voltage (V)")
@@ -537,10 +547,9 @@ def reverse_plotter(data_file, pdf):
         color="cadetblue",
         label="Data",
     )
-    ax.grid(True)
 
-    ax2.scatter(x, derivative, marker="o", s=5, color="coral", label="Derivative")
-    ax2.plot(x, y_poly_fifth_deg, color="limegreen", label="5th-deg polynomial")
+    ax2.scatter(x, derivative, marker="o", s=5, color="black", label="Derivative")
+    ax2.plot(x, y_poly_fifth_deg, color="limegreen", label="5th degree polynomial")
     ax2.plot(
         x_poly_second_deg,
         y_poly_peak,
@@ -549,7 +558,7 @@ def reverse_plotter(data_file, pdf):
     )
     ax2.axvline(
         V_bd,
-        color="gold",
+        color="coral",
         label=f"V_bd = {V_bd:.2f} ± {abs(data_file['V_bd_std'].iloc[0]):.2f} V",
     )
 

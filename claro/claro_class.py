@@ -20,7 +20,9 @@ class FolderReader:
         matching_files = []
         bad_files = []
 
-        for root, dirs, filenames in tqdm(os.walk(self.root_folder), "Reading files"):
+        for root, dirs, filenames in tqdm(
+            os.walk(self.root_folder), "Reading files", total=34200
+        ):
             if fnmatch.fnmatch(
                 root, "*Station_1__*/Station_1__??_Summary/Chip_*/S_curve"
             ):
@@ -226,7 +228,7 @@ class DataReader:
         """
         self.path = path
         self.data = _get_data(path)
-        self.fileinfo = _get_fileinfo(path)
+        self.fileinfo = _file_information(path)
         self.erf = ErrorFunctionFit(path).erf_fit()
         self.data_processed = data_processed
 
@@ -274,20 +276,20 @@ class Histogram:
         discrepancy = transition_points_data - transition_points_erf
 
         fig, axs = plt.subplots(3)
-        fig.suptitle("Histogram of the transition points distribution")
+        fig.suptitle("Distribution of the transition points")
 
         axs[0].hist(transition_points_data, bins=200, color="coral")
         axs[1].hist(transition_points_erf, bins=200, color="limegreen")
         axs[2].hist(discrepancy, bins=20, range=(-1e-6, 1e-6), color="cadetblue")
 
         axs[0].set_title("Transition points (data)")
-        axs[1].set_title("Transition points (erf)")
-        axs[2].set_title("Discrepancy")
+        axs[1].set_title("Transition points (erf fit)")
+        axs[2].set_title("Discrepancy (data - erf fit)")
 
         plt.tight_layout()
 
         if saveplot == True:
-            plotname = f"Histogram_transition_points.png"
+            plotname = f"histogram_tr_points.png"
             plt.savefig(plotname, bbox_inches="tight")
             print(f"Plot saved as {os.getcwd()}\{plotname}")
         plt.show()
@@ -314,7 +316,7 @@ class HarryPlotter:
 
         """
         self.path = path
-        self.fileinfo = _get_fileinfo(path)
+        self.fileinfo = _file_information(path)
         self.data = _get_data(path)
         self.linear = LinearFit(path)
         self.erf = ErrorFunctionFit(path)
@@ -332,7 +334,7 @@ class HarryPlotter:
         fig, ax = plt.subplots()
 
         fig.suptitle(
-            f"Fit Claro: Station {self.fileinfo['station']}, Chip {self.fileinfo['chip']}, Channel {self.fileinfo['channel']}"
+            f"Station {self.fileinfo['station']}, Chip {self.fileinfo['chip']}, Channel {self.fileinfo['channel']}"
         )
         plt.plot(self.data["x"], self.data["y"], "o", label="data")
         plt.plot(
@@ -367,7 +369,7 @@ class HarryPlotter:
         plt.legend()
 
         if saveplot == True:
-            plotname = f"Plot_Claro_Chip{self.fileinfo['chip']}_Ch{self.fileinfo['channel']}.png"
+            plotname = f"single_plot_St{self.fileinfo['station']}_Chip{self.fileinfo['chip']}_Ch{self.fileinfo['channel']}.png"
             plt.savefig(plotname, bbox_inches="tight")
             print(f"Plot saved as {os.getcwd()}\{plotname}")
         plt.show()
@@ -393,7 +395,7 @@ def modified_erf(x, height, a, b):
     return height / 2 * (1 + special.erf((x - a) / (b / 2 * np.sqrt(2))))
 
 
-def _get_fileinfo(path):
+def _file_information(path):
     """
     Retrieves Station chip and channel number from the path.
 
