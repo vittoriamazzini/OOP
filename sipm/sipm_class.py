@@ -70,7 +70,7 @@ class SingleFile:
 
         linear_roomT = 0.75
         linear_LN2 = 1.55
-        peak_width = 15
+        peak_width = 20
 
         # Create the savepath folder if it doesn't exist
         if not os.path.exists(savepath):
@@ -208,34 +208,37 @@ class MultipleFiles:
 
                 fig, axs = plt.subplots(2)
                 fig.suptitle(f"{dir}: R_q and V_Bd distribution")
-
-                axs[0].set_title("Histogram of the Quenching Resistance")
-                axs[0].set_xlabel("$R_q [\Omega$]")
-                axs[0].set_ylabel("Frequency")
-                axs[1].set_title("Histogram of the Breakdown Voltage")
-                axs[1].set_xlabel("$V_{Bd}$ [V]")
-                axs[1].set_ylabel("Frequency")
-
-                forward_data.plot.hist(
-                    column=["R_quenching"],
-                    ax=axs[0],
-                    bins=15,
-                    range=(
+                titles = [
+                    "Histogram of the Quenching Resistance",
+                    "Histogram of the Breakdown Voltage",
+                ]
+                xlabels = ["$R_q [\Omega$]", "$V_{Bd}$ [V]"]
+                ylabels = ["Frequency", "Frequency"]
+                bins = [15, 15]
+                ranges = [
+                    (
                         min(forward_data["R_quenching"]),
                         max(forward_data["R_quenching"]),
                     ),
-                    color="limegreen",
-                    alpha=1,
-                )
+                    (min(reverse_data["V_bd"]), max(reverse_data["V_bd"])),
+                ]
+                colors = ["limegreen", "cadetblue"]
+                alpha = [1, 1]
 
-                reverse_data.plot.hist(
-                    column=["V_bd"],
-                    ax=axs[1],
-                    bins=15,
-                    range=(min(reverse_data["V_bd"]), max(reverse_data["V_bd"])),
-                    color="cadetblue",
-                    alpha=1,
-                )
+                for i, ax in enumerate(axs):
+                    ax.set_title(titles[i])
+                    ax.set_xlabel(xlabels[i])
+                    ax.set_ylabel(ylabels[i])
+                    ax.grid(True)
+                    data = forward_data if i == 0 else reverse_data
+                    data.plot.hist(
+                        column=["R_quenching", "V_bd"][i],
+                        ax=ax,
+                        bins=bins[i],
+                        range=ranges[i],
+                        color=colors[i],
+                        alpha=alpha[i],
+                    )
 
                 plt.tight_layout()
                 plotname = f"Histograms of {dir}.png"
@@ -302,10 +305,9 @@ class MultipleFiles:
         )
 
 
-######################## Static Methods ##############################
+######################## Functions ##############################
 
 
-@staticmethod
 def _file_information(path):
     """
     Extracts relevant information from a file path using regular expressions.
@@ -331,7 +333,6 @@ def _file_information(path):
     return _file_information
 
 
-@staticmethod
 def forward_analyzer(data_file, start_fit):
     """
     Analyze the forward IV curve file and returns the results.
@@ -368,7 +369,6 @@ def forward_analyzer(data_file, start_fit):
     return pd.Series(results)
 
 
-@staticmethod
 def forward_plotter(data_file, pdf):
     """
     Plot the forward IV curve for a given SiPM and save the plot to a PDF.
@@ -392,6 +392,7 @@ def forward_plotter(data_file, pdf):
     lin_y = lin_data["y_lin"]
 
     fig, ax = plt.subplots()
+    ax.grid(True)
 
     sipm_number = lin_data["SiPM"].drop_duplicates().iloc[0]
 
@@ -422,7 +423,6 @@ def forward_plotter(data_file, pdf):
     plt.close()
 
 
-@staticmethod
 def reverse_analyzer(data_file, peak_width):
     """Analyzes a reverse IV curve file and returns the results.
 
@@ -437,48 +437,60 @@ def reverse_analyzer(data_file, peak_width):
         - "V_bd": The breakdown voltage of the SiPM, in volts.
         - "V_bd_std": The uncertainty in the breakdown voltage, in volts.
         - "width": The full width at half maximum (FWHM) of the peak in the derivative curve, in volts.
-        - "coefs": A NumPy array containing the coefficients of the 5th degree polynomial fit to the derivative curve.
-        - "poly_coefs_peak": A NumPy array containing the coefficients of the 2nd degree polynomial fit around the peak.
+        - "fifth_deg_coefs": A NumPy array containing the coefficients of the 5th degree polynomial fit to the derivative curve.
+        - "second_deg_coefs": A NumPy array containing the coefficients of the 2nd degree polynomial fit around the peak.
     """
 
     x = np.array(data_file["V"])
     y = np.array(data_file["I"])
 
-    def norm_derivative(x, y):
-        dy_dx = np.gradient(y) / np.gradient(x)
-        return 1 / y * dy_dx
-
     derivative = norm_derivative(x, y)
 
-    coefs = np.polyfit(x, derivative, 5)
-    y_fit = np.polyval(coefs, x)
+    fifth_deg_coefs = np.polyfit(x, derivative, 5)
+    y_fit = np.polyval(fifth_deg_coefs, x)
 
-    peaks, _ = signal.find_peaks(y_fit, width=peak_width)
-    if len(peaks) > 0:
-        idx_max = peaks[0]
-        x_max = x[idx_max]
-        fwhm = x[int(idx_max + peak_width / 2)] - x[int(idx_max - peak_width / 2)]
+    x_peak = np.nan
 
-        x_poly = x[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
-        y_poly = y_fit[np.logical_and(x >= (x_max - fwhm), x <= (x_max + fwhm))]
-        poly_coefs_peak = np.polyfit(x_poly, y_poly, 2)
+    peaks_fifth, _ = signal.find_peaks(y_fit, width=peak_width)
 
+    if len(peaks_fifth) > 0:
+        peak_fifth_deg = peaks_fifth[0]
+        x_max = x[peak_fifth_deg]
+        fwhm = (
+            x[int(peak_fifth_deg + peak_width / 2)]
+            - x[int(peak_fifth_deg - peak_width / 2)]
+        )
+
+        x_poly_second = x[
+            np.logical_and(
+                x >= (x_max - np.sqrt(2) * fwhm), x <= (x_max + np.sqrt(2) * fwhm)
+            )
+        ]
+        y_poly_second = y_fit[
+            np.logical_and(
+                x >= (x_max - np.sqrt(2) * fwhm), x <= (x_max + np.sqrt(2) * fwhm)
+            )
+        ]
+        second_deg_coefs = np.polyfit(x_poly_second, y_poly_second, 2)
+        y_second_deg = np.polyval(second_deg_coefs, x)
+
+        x_peak = x[np.argmax(y_second_deg)]
+        std = x[int(x_peak + peak_width / 2)] - x[int(x_peak - peak_width / 2)]
     else:
-        poly_coefs_peak = [np.nan, np.nan, np.nan]
-        fwhm = np.nan
+        second_deg_coefs = [np.nan, np.nan, np.nan]
+        std = np.nan
 
     results = {
-        "V_bd": x_max,
-        "V_bd_std": fwhm / 2,
-        "width": fwhm,
-        "coefs": coefs,
-        "poly_coefs_peak": poly_coefs_peak,
+        "V_bd": x_peak,
+        "V_bd_std": std / 2,
+        "width": std,
+        "fifth_deg_coefs": fifth_deg_coefs,
+        "second_deg_coefs": second_deg_coefs,
     }
 
     return pd.Series(results)
 
 
-@staticmethod
 def reverse_plotter(data_file, pdf):
     """
     Plots the reverse current-voltage (IV) curve and its derivative, along with a 5th-degree polynomial fit
@@ -488,7 +500,7 @@ def reverse_plotter(data_file, pdf):
     -----------
     data_file : pandas DataFrame
         A DataFrame containing the IV curve data, with columns 'V', 'I', and 'I_err', as well as additional
-        columns 'V_bd', 'V_bd_std', 'width', 'coefs', 'poly_coefs_peak', and 'SiPM'.
+        columns 'V_bd', 'V_bd_std', 'width', 'coefs', 'second_deg_coefs', and 'SiPM'.
     pdf : matplotlib.backends.backend_pdf.PdfPages
         A PdfPages object to which the plot will be saved.
 
@@ -498,21 +510,17 @@ def reverse_plotter(data_file, pdf):
     y = np.array(data_file["I"])
 
     V_bd = data_file["V_bd"].iloc[0]
-    coefs = data_file["coefs"].iloc[0]  # fifth degree coefs
-
-    def norm_derivative(x, y):
-        dy_dx = np.gradient(y) / np.gradient(x)
-        return 1 / y * dy_dx
+    fifth_deg_coefs = data_file["fifth_deg_coefs"].iloc[0]  # fifth degree coefs
 
     derivative = norm_derivative(x, y)
 
     y_poly_fifth_deg = (
-        coefs[5]
-        + coefs[4] * x
-        + coefs[3] * x**2
-        + coefs[2] * x**3
-        + coefs[1] * x**4
-        + coefs[0] * x**5
+        fifth_deg_coefs[5]
+        + fifth_deg_coefs[4] * x
+        + fifth_deg_coefs[3] * x**2
+        + fifth_deg_coefs[2] * x**3
+        + fifth_deg_coefs[1] * x**4
+        + fifth_deg_coefs[0] * x**5
     )
     x_poly_second_deg = x[
         np.logical_and(
@@ -520,16 +528,17 @@ def reverse_plotter(data_file, pdf):
             x <= (V_bd + data_file["width"].iloc[0] / 2),
         )
     ]
-    poly_coefs_peak = data_file["poly_coefs_peak"].iloc[0]
+    second_deg_coefs = data_file["second_deg_coefs"].iloc[0]
     y_poly_peak = (
-        poly_coefs_peak[2]
-        + poly_coefs_peak[1] * x_poly_second_deg
-        + poly_coefs_peak[0] * x_poly_second_deg**2
+        second_deg_coefs[2]
+        + second_deg_coefs[1] * x_poly_second_deg
+        + second_deg_coefs[0] * x_poly_second_deg**2
     )
 
     sipm_number = list(data_file["SiPM"].drop_duplicates())[0]
 
     fig, ax = plt.subplots()
+    ax.grid(True)
     fig.suptitle(f"Reverse IV curve: SiPM {sipm_number}")
     ax.set_yscale("log")
     ax.set_xlabel("Voltage (V)")
@@ -553,7 +562,7 @@ def reverse_plotter(data_file, pdf):
         x_poly_second_deg,
         y_poly_peak,
         color="red",
-        label="Second degree around peak",
+        label="2nd degree around peak",
     )
     ax2.axvline(
         V_bd,
@@ -568,3 +577,8 @@ def reverse_plotter(data_file, pdf):
 
     pdf.savefig()
     plt.close()
+
+
+def norm_derivative(x, y):
+    dy_dx = np.gradient(y) / np.gradient(x)
+    return 1 / y * dy_dx
