@@ -285,6 +285,9 @@ class Histogram:
         axs[0].set_title("Transition points (data)")
         axs[1].set_title("Transition points (erf fit)")
         axs[2].set_title("Discrepancy (data - erf fit)")
+        axs[0].grid(True)
+        axs[1].grid(True)
+        axs[2].grid(True)
 
         plt.tight_layout()
 
@@ -332,6 +335,7 @@ class HarryPlotter:
             None
         """
         fig, ax = plt.subplots()
+        ax.grid(True)
 
         fig.suptitle(
             f"Station {self.fileinfo['station']}, Chip {self.fileinfo['chip']}, Channel {self.fileinfo['channel']}"
@@ -372,13 +376,13 @@ class HarryPlotter:
             plotname = f"single_plot_St{self.fileinfo['station']}_Chip{self.fileinfo['chip']}_Ch{self.fileinfo['channel']}.png"
             plt.savefig(plotname, bbox_inches="tight")
             print(f"Plot saved as {os.getcwd()}\{plotname}")
-        plt.show()
+
+        plt.close()
 
 
 ######################## Static Methods ##############################
 
 
-@staticmethod
 def modified_erf(x, height, a, b):
     """
     Computes the modified error function.
