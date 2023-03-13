@@ -380,7 +380,7 @@ class HarryPlotter:
         plt.close()
 
 
-######################## Static Methods ##############################
+######################## Functions ##############################
 
 
 def modified_erf(x, height, a, b):
